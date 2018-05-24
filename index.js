@@ -10,15 +10,25 @@ function genId(){
   return id++;
 }
 
-function itemsToString(items){
-  return items.map(item => item.toString() + ";").join("");
+function tabs(n){
+  let str = "";
+  for(let i = 0; i < n; i++){
+    str += "\t";
+  }
+  return str;
 }
 
 function attributesToString(attributes){
-  return `[${aListToString(attributes)}]`;
+  const aList = formatAList(attributes);
+  if(aList.length === 0){
+    return "";
+  }
+  else{
+    return `[${aList.join("; ")}]`;
+  }
 }
 
-function aListToString(attributes){
+function formatAList(attributes){
   let list = [];
   for(let attrName in attributes){
     const value = attributes[attrName];
@@ -26,16 +36,16 @@ function aListToString(attributes){
       list.push(attrName + " = \"" + value + "\"");
     }
   }
-  return list.join(";");
+  return list;
 }
 
 function typeParamsToString(type, params){
-  const attributesStr = attributesToString(this.graphParams);
-  if(attributesStr === "[]"){
+  const aList = formatAList(params);
+  if(aList.length === 0){
     return "";
   }
   else{
-    return `${type} ${attributesStr};`;
+    return `${type} [${aList.join("; ")}]`;
   }
 }
 
@@ -132,8 +142,9 @@ class Record{
     else {
       label = this.cells[0].toString();
     }
-    const attributes = Object.assign({}, this.attributes, {label:label, shape:"record"});
-    return `${this.id} ${attributesToString(attributes)}`;
+    const attributes = Object.assign({}, this.attributes, {label:this.label, shape:"record"});
+    let attrsStr = attributesToString(attributes);
+    return `${this.id}${(attrsStr === "" ? "" : " " + attrsStr)}`;
   }
 }
 
@@ -153,7 +164,8 @@ class Node{
 
   toString(){
     const attributes = Object.assign({}, this.attributes, {label:this.label});
-    return `${this.id} ${attributesToString(attributes)}`;
+    let attrsStr = attributesToString(attributes);
+    return `${this.id}${(attrsStr === "" ? "" : " " + attrsStr)}`;
   }
 }
 
@@ -179,7 +191,8 @@ class Edge{
 
   toString(){
     let separator = this.params.isOriented ? " -> " : " -- ";
-    return this.nodes.map(node => `"${node.id}"`).join(separator) + ` ${attributesToString(this.attributes)}`;
+    let attrsStr = attributesToString(this.attributes);
+    return this.nodes.map(node => `"${node.id}"`).join(separator) + `${(attrsStr === "" ? "" : " " + attrsStr)}`;
   }
 }
 
@@ -218,21 +231,21 @@ class BaseGraph{
     return this;
   }
 
-  toString(){
+  toString(level = 0){
     this.items.forEach(item => {
       if(item.setParams){
         item.setParams({isOriented:this.params.isOriented});
       }
     });
     const attributes = Object.assign({}, this.attributes, {label:this.label});
-    const attribsStr = aListToString(attributes);
-    return `{
-        ${attribsStr ? attribsStr + ";" : ""}
-        ${typeParamsToString("graph", this.params.graph)}
-        ${typeParamsToString("node", this.params.node)}
-        ${typeParamsToString("edge", this.params.edge)}
-        ${itemsToString(this.items)}
-      }`;
+    let content = [
+      ...formatAList(attributes),
+      typeParamsToString("graph", this.params.graph),
+      typeParamsToString("node", this.params.node),
+      typeParamsToString("edge", this.params.edge),
+      ...this.items.map(item => item.toString(level))
+    ].filter(c => c).map(c => tabs(level + 1) + c + ";");
+    return `${tabs(level)}{\n${content.join("\n")}\n${tabs(level)}}`;
   }
 }
 
@@ -243,8 +256,8 @@ class Graph extends BaseGraph{
     super(label);
   }
 
-  toString(){
-    return `${this.params.isStrict ? "strict" : ""} ${this.params.isOriented ? "digraph" : "graph"} "${this.id}" ${super.toString()}`;
+  toString(level = 0){
+    return `${this.params.isStrict ? "strict" : ""} ${this.params.isOriented ? "digraph" : "graph"} "${this.id}" ${super.toString(level)}`;
   }
 }
 
@@ -270,8 +283,8 @@ class Subgraph extends BaseGraph{
     return (this.params.isCluster ? "cluster" : "") + this._id;
   }
 
-  toString(){
-    return `subgraph "${this.id}" ${super.toString()}`;
+  toString(level = 0){
+    return `subgraph "${this.id}" ${super.toString(level)}`;
   }
 }
 
